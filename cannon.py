@@ -1,11 +1,11 @@
 import os
 import subprocess
 import smtplib
+import time
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
-
-import time
 from RPi import GPIO
+
 
 def takePicture():
     file = subprocess.check_output('./grabpicture.sh')
@@ -23,10 +23,12 @@ def takePicture():
     msg['To'] = to
 
     # Assume we know that the image files are all in PNG format
-    fp = open(os.path.join('./output/', file.rstrip('\n')), 'rb')
-    img = MIMEImage(fp.read())
-    fp.close()
-    msg.attach(img)
+    with open(os.path.join('./output/', file.rstrip('\n')), 'rb') as fp:
+        img = MIMEImage(fp.read())
+        msg.attach(img)
+
+    if not img:
+        raise Exception("Failed to generate image")
 
     # Send the email via our own SMTP server.
     s = smtplib.SMTP('smtp.gmail.com', 587, timeout=20)
@@ -36,12 +38,17 @@ def takePicture():
     s.login(gmailUser, gmailPassword)
     s.sendmail(gmailUser, to, msg.as_string())
     s.quit()
+    
 
-GPIO.setmode(GPIO.BOARD)
-GPIO.setup(3, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-while True:
-    inputval = GPIO.input(3)
-    print inputval
-    if(inputval == False):
-        takePicture()
-    time.sleep(1)
+def main():
+    GPIO.setmode(GPIO.BOARD)
+    GPIO.setup(3, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+    while True:
+        inputval = GPIO.input(3)
+        print inputval
+        if not inputval:
+            takePicture()
+        time.sleep(1)
+
+if __name__ == "__main__":
+    main()
